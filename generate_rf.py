@@ -47,6 +47,7 @@ def template_exp_option(
     batch_size,
 ):
     out = f"""python -m egg.zoo.objects_game.train \
+    --experiment_id {experiment_id} \
     --perceptual_dimensions {perceptual_dimensions} \
     --vocab_size {vocab_size} \
     --n_distractors {n_distractors} \
