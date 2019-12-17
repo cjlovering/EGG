@@ -3,7 +3,7 @@ import os
 import math
 import random
 
-PROCESS_PER_SCRIPT = 5
+PROCESS_PER_SCRIPT = 1
 
 def template_file(texts):
     text = "".join(texts)
