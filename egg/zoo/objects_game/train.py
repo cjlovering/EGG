@@ -16,10 +16,14 @@ import operator
 import numpy as np
 import pathlib
 
+import pandas as pd
+
 def get_params():
     parser = argparse.ArgumentParser()
 
     input_data = parser.add_mutually_exclusive_group()
+    input_data.add_argument('--experiment_id', type=str, default='default_id',
+                        help='Experiment id.')
     input_data.add_argument('--perceptual_dimensions', type=str, default='[4, 4, 4, 4, 4]',
                         help='Number of features for every perceptual dimension')
     input_data.add_argument('--load_data_path', type=str, default=None,
@@ -57,6 +61,15 @@ def get_params():
                         help="Learning rate for Sender's parameters (default: 1e-1)")
     parser.add_argument('--receiver_lr', type=float, default=1e-1,
                         help="Learning rate for Receiver's parameters (default: 1e-1)")
+
+    parser.add_argument('--sender_entropy_coeff', type=float, default=1e-1,
+                        help='The entropy regularisation coefficient for Sender (default: 1e-1)')
+    parser.add_argument('--receiver_entropy_coeff', type=float, default=1e-1,
+                        help='The entropy regularisation coefficient for Receiver (default: 1e-1)')
+    parser.add_argument('--length_cost', type=float, default=0.0,
+                        help="Penalty for the message length, each symbol would before <EOS> would be "
+                             "penalized by this cost (default: 0.0)")
+
     parser.add_argument('--temperature', type=float, default=1.0,
                         help="GS temperature for the sender (default: 1.0)")
     parser.add_argument('--mode', type=str, default='gs',
@@ -113,6 +126,11 @@ def loss(_sender_input,  _message, _receiver_input, receiver_output, _labels):
     loss = F.cross_entropy(receiver_output, _labels, reduction="none")
     return loss, {'acc': acc}
 
+def non_differentiable_loss(_sender_input, _message, _receiver_input, receiver_output, labels):
+    labels = labels.squeeze(1)
+    incorrect = (receiver_output != labels).detach().float()
+    acc = (receiver_output == labels).detach().float()
+    return incorrect, {'acc': acc.mean()}
 
 if __name__ == "__main__":
     opts = get_params()
@@ -144,30 +162,105 @@ if __name__ == "__main__":
         else:
             baseline_msg += f'| Data was loaded froman external file, thus no perceptual_dimension vector was provided, "smart baseline" cannot be computed\n'
 
-    print(baseline_msg)
-
-    sender = Sender(n_features=data_loader.n_features, n_hidden=opts.sender_hidden)
-
-    receiver = Receiver(n_features=data_loader.n_features, linear_units=opts.receiver_hidden)
+    sender = Sender(
+        n_features=data_loader.n_features,
+        n_hidden=opts.sender_hidden
+    )
+    receiver = Receiver(
+        n_features=data_loader.n_features,
+        linear_units=opts.receiver_hidden
+    )
 
     if opts.mode.lower() == 'gs':
-        sender = core.RnnSenderGS(sender,
-                                    opts.vocab_size,
-                                    opts.sender_embedding,
-                                    opts.sender_hidden,
-                                    cell=opts.sender_cell,
-                                    max_len=opts.max_len,
-                                    temperature=opts.temperature
-                                    )
-
-        receiver = core.RnnReceiverGS(receiver,
-                                    opts.vocab_size,
-                                    opts.receiver_embedding,
-                                    opts.receiver_hidden,
-                                    cell=opts.receiver_cell
-                                    )
-
+        sender = core.RnnSenderGS(
+            sender,
+            opts.vocab_size,
+            opts.sender_embedding,
+            opts.sender_hidden,
+            cell=opts.sender_cell,
+            max_len=opts.max_len,
+            temperature=opts.temperature
+        )
+        receiver = core.RnnReceiverGS(
+            receiver,
+            opts.vocab_size,
+            opts.receiver_embedding,
+            opts.receiver_hidden,
+            cell=opts.receiver_cell
+        )
         game = core.SenderReceiverRnnGS(sender, receiver, loss)
+    elif opts.mode.lower() == 'gs-straight-through':
+        sender = core.RnnSenderGS(
+            sender,
+            opts.vocab_size,
+            opts.sender_embedding,
+            opts.sender_hidden,
+            cell=opts.sender_cell,
+            max_len=opts.max_len,
+            temperature=opts.temperature,
+            straight_through=True
+        )
+        receiver = core.RnnReceiverGS(
+            receiver,
+            opts.vocab_size,
+            opts.receiver_embedding,
+            opts.receiver_hidden,
+            cell=opts.receiver_cell
+        )
+        game = core.SenderReceiverRnnGS(sender, receiver, loss)
+    elif opts.mode.lower() == 'rf-deterministic':
+        sender = core.RnnSenderReinforce(
+            sender,
+            opts.vocab_size,
+            opts.sender_embedding,
+            opts.sender_hidden,
+            cell=opts.sender_cell,
+            max_len=opts.max_len,
+            force_eos=False
+        )
+        receiver = core.RnnReceiverDeterministic(
+            receiver,
+            opts.vocab_size,
+            opts.receiver_embedding,
+            opts.receiver_hidden,
+            cell=opts.receiver_cell
+        )
+        game = core.SenderReceiverRnnReinforce(
+            sender,
+            receiver,
+            loss,
+            sender_entropy_coeff=opts.sender_entropy_coeff,
+            receiver_entropy_coeff=opts.receiver_entropy_coeff,
+            length_cost=opts.length_cost,
+        )
+    elif opts.mode.lower() == "rf":
+        sender = core.RnnSenderReinforce(
+            sender,
+            opts.vocab_size,
+            opts.sender_embedding,
+            opts.sender_hidden,
+            cell=opts.sender_cell,
+            max_len=opts.max_len,
+            force_eos=False
+        )
+        receiver = core.RnnReceiverReinforce(
+            n_features=data_loader.n_features,
+            linear_units=opts.receiver_hidden)
+        receiver = core.RnnReceiverDeterministic(
+            receiver,
+            opts.vocab_size,
+            opts.receiver_embedding,
+            opts.receiver_hidden,
+            cell=opts.receiver_cell
+        )
+        game = core.SenderReceiverRnnReinforce(
+            sender,
+            receiver,
+            non_differentiable_loss,
+            sender_entropy_coeff=opts.sender_entropy_coeff,
+            receiver_entropy_coeff=opts.receiver_entropy_coeff,
+            length_cost=opts.length_cost
+        )
     else:
         raise NotImplementedError(f'Unknown training mode, {opts.mode}')
 
@@ -192,7 +285,10 @@ if __name__ == "__main__":
         receiver_outputs = torch.stack(receiver_outputs)
         labels = torch.stack(labels)
 
-        tensor_accuracy = receiver_outputs.argmax(dim=1) == labels
+        if opts.mode.lower() != 'rf':
+            tensor_accuracy = receiver_outputs.argmax(dim=1) == labels
+        else:
+            tensor_accuracy = receiver_outputs == labels
         accuracy = torch.mean(tensor_accuracy.float()).item()
 
         unique_dict = {}
@@ -207,10 +303,11 @@ if __name__ == "__main__":
 
         print(f'| Accuracy on test set: {accuracy}')
 
-        compute_mi_input_msgs(sender_inputs, messages)
-
-        print(f'entropy sender inputs {entropy(sender_inputs)}')
-        print(f'mi sender inputs msgs {mutual_info(sender_inputs, messages)}')
+        # compute_mi_input_msgs(sender_inputs, messages)
+        entropy_result = entropy(sender_inputs)
+        mutual_info_result = mutual_info(sender_inputs, messages)
+        print(f'entropy sender inputs {entropy_result}')
+        print(f'mi sender inputs msgs {mutual_info_result}')
 
         if opts.dump_msg_folder:
             opts.dump_msg_folder.mkdir(exist_ok=True)
@@ -247,3 +344,21 @@ if __name__ == "__main__":
                 f.write(f'Unique messages produced by sender: {len(msg_dict.keys())}\n')
                 f.write(f"Messagses: 'msg' : msg_count: {str(sorted_msgs)}\n")
                 f.write(f'\nAccuracy: {accuracy}')
+        df = pd.DataFrame({
+            "perceptual_dimensions": list(opts.perceptual_dimensions),
+            "n_distractors": opts.n_distractors,
+            "train_samples": opts.train_samples,
+            "validation_samples": opts.validation_samples,
+            "test_samples": opts.test_samples,
+            "data_seed": opts.data_seed,
+            "random_seed": opts.random_seed,
+            "sender_lr": opts.sender_lr,
+            "receiver_lr": opts.receiver_lr,
+            "sender_entropy_coeff": opts.sender_entropy_coeff,
+            "receiver_entropy_coeff": opts.receiver_entropy_coeff,
+            "mode": opts.mode,
+            "accuracy": accuracy,
+            "entropy_result": entropy_result,
+            "mutual_info_result": mutual_info_result,
+        })
+        df.to_csv(opts.experiment_id, index=False)
