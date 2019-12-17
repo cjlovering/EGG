@@ -10,6 +10,8 @@ import torch.nn.functional as F
 import egg.core as core
 from egg.zoo.objects_game.features import VectorsLoader
 from egg.zoo.objects_game.archs import Sender, Receiver
+from egg.zoo.external_game.archs import ReinforceReceiver
+
 from egg.zoo.objects_game.util import compute_baseline_accuracy, compute_mi_input_msgs, entropy, mutual_info
 from egg.core.util import move_to
 import operator
@@ -127,7 +129,6 @@ def loss(_sender_input,  _message, _receiver_input, receiver_output, _labels):
     return loss, {'acc': acc}
 
 def non_differentiable_loss(_sender_input, _message, _receiver_input, receiver_output, labels):
-    labels = labels.squeeze(1)
     incorrect = (receiver_output != labels).detach().float()
     acc = (receiver_output == labels).detach().float()
     return incorrect, {'acc': acc.mean()}
@@ -189,7 +190,7 @@ if __name__ == "__main__":
             cell=opts.receiver_cell
         )
         game = core.SenderReceiverRnnGS(sender, receiver, loss)
-    elif opts.mode.lower() == 'gs-straight-through':
+    elif opts.mode.lower() == 'gs-hard':
         sender = core.RnnSenderGS(
             sender,
             opts.vocab_size,
@@ -243,10 +244,8 @@ if __name__ == "__main__":
             max_len=opts.max_len,
             force_eos=False
         )
+        receiver = ReinforceReceiver(output_size=data_loader.n_features, n_hidden=opts.receiver_hidden)
         receiver = core.RnnReceiverReinforce(
-            n_features=data_loader.n_features,
-            linear_units=opts.receiver_hidden)
-        receiver = core.RnnReceiverDeterministic(
             receiver,
             opts.vocab_size,
             opts.receiver_embedding,
@@ -276,7 +275,7 @@ if __name__ == "__main__":
     trainer.train(n_epochs=opts.n_epochs)
 
     if opts.evaluate:
-        is_gs = opts.mode == 'gs'
+        is_gs = 'gs' in opts.mode
         sender_inputs, messages, receiver_inputs, receiver_outputs, labels = core.dump_sender_receiver(game, test_data, is_gs, variable_length=True, device=device)
 
         receiver_outputs = move_to(receiver_outputs, device)
@@ -303,7 +302,6 @@ if __name__ == "__main__":
 
         print(f'| Accuracy on test set: {accuracy}')
 
-        # compute_mi_input_msgs(sender_inputs, messages)
         entropy_result = entropy(sender_inputs)
         mutual_info_result = mutual_info(sender_inputs, messages)
         print(f'entropy sender inputs {entropy_result}')
@@ -345,7 +343,7 @@ if __name__ == "__main__":
                 f.write(f"Messagses: 'msg' : msg_count: {str(sorted_msgs)}\n")
                 f.write(f'\nAccuracy: {accuracy}')
         df = pd.DataFrame({
-            "perceptual_dimensions": list(opts.perceptual_dimensions),
+            "perceptual_dimensions": [opts.perceptual_dimensions],
             "n_distractors": opts.n_distractors,
             "train_samples": opts.train_samples,
             "validation_samples": opts.validation_samples,
@@ -361,4 +359,4 @@ if __name__ == "__main__":
             "entropy_result": entropy_result,
             "mutual_info_result": mutual_info_result,
         })
-        df.to_csv(opts.experiment_id, index=False)
+        df.to_csv(f"{opts.experiment_id}.csv", index=False)
