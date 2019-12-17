@@ -19,7 +19,7 @@ mkdir -p data
 mkdir -p output
 
 mkdir -p ./logs/
-mkdir -p ./runs/
+mkdir -p ./output/
 
 {text}
 
