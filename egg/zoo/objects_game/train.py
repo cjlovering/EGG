@@ -24,13 +24,12 @@ def get_params():
     parser = argparse.ArgumentParser()
 
     input_data = parser.add_mutually_exclusive_group()
-    input_data.add_argument('--experiment_id', type=str, default='default_id',
-                        help='Experiment id.')
     input_data.add_argument('--perceptual_dimensions', type=str, default='[4, 4, 4, 4, 4]',
                         help='Number of features for every perceptual dimension')
     input_data.add_argument('--load_data_path', type=str, default=None,
                         help='Path to .npz data file to load')
-
+    parser.add_argument('--experiment_id', type=str, default='default_id',
+                        help='Experiment id.')
     parser.add_argument('--n_distractors', type=int, default=3,
                         help='Number of distractor objects for the receiver (default: 3)')
     parser.add_argument('--train_samples', type=float, default=1e5,
