@@ -76,7 +76,7 @@ def main():
     options = {
         "perceptual_dimensions": ["[10,10]"],
         "vocab_size": [20],
-        "n_distractors": [9],
+        "n_distractors": [1],
         "n_epoch": [5000],
         "max_len": [2],
         "train_samples": [80],

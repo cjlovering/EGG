@@ -128,7 +128,7 @@ def loss(_sender_input,  _message, _receiver_input, receiver_output, _labels):
     return loss, {'acc': acc}
 
 def non_differentiable_loss(_sender_input, _message, _receiver_input, receiver_output, labels):
-    incorrect = (receiver_output != labels).detach().float()
+    incorrect = -(receiver_output == labels).detach().float()
     acc = (receiver_output == labels).detach().float()
     return incorrect, {'acc': acc.mean()}
 
@@ -243,7 +243,10 @@ if __name__ == "__main__":
             max_len=opts.max_len,
             force_eos=False
         )
-        receiver = ReinforceReceiver(output_size=data_loader.n_features, n_hidden=opts.receiver_hidden)
+        receiver = ReinforceReceiver(
+            output_size=data_loader.n_features, 
+            n_hidden=opts.receiver_hidden
+        )
         receiver = core.RnnReceiverReinforce(
             receiver,
             opts.vocab_size,
@@ -275,11 +278,15 @@ if __name__ == "__main__":
 
     if opts.evaluate:
         is_gs = 'gs' in opts.mode
-        sender_inputs, messages, receiver_inputs, receiver_outputs, labels = core.dump_sender_receiver(game, test_data, is_gs, variable_length=True, device=device)
+        sender_inputs, messages, receiver_inputs, receiver_outputs, labels = core.dump_sender_receiver(
+            game, test_data, is_gs, variable_length=True, device=device)
 
+        _, _, _, train_receiver_outputs, train_labels = core.dump_sender_receiver(
+            game, train_data, is_gs, variable_length=True, device=device)
+
+        # Test
         receiver_outputs = move_to(receiver_outputs, device)
         labels = move_to(labels, device)
-
         receiver_outputs = torch.stack(receiver_outputs)
         labels = torch.stack(labels)
 
@@ -288,6 +295,19 @@ if __name__ == "__main__":
         else:
             tensor_accuracy = receiver_outputs == labels
         accuracy = torch.mean(tensor_accuracy.float()).item()
+
+        # Train
+        train_receiver_outputs = move_to(train_receiver_outputs, device)
+        train_labels = move_to(train_labels, device)
+        train_receiver_outputs = torch.stack(train_receiver_outputs)
+        train_labels = torch.stack(train_labels)
+
+        if opts.mode.lower() != 'rf':
+            train_tensor_accuracy = train_receiver_outputs.argmax(dim=1) == train_labels
+        else:
+            train_tensor_accuracy = train_receiver_outputs == train_labels
+        train_accuracy = torch.mean(train_tensor_accuracy.float()).item()
+
 
         unique_dict = {}
 
@@ -355,6 +375,7 @@ if __name__ == "__main__":
             "receiver_entropy_coeff": opts.receiver_entropy_coeff,
             "mode": opts.mode,
             "accuracy": accuracy,
+            "train_accuracy": train_accuracy,
             "entropy_result": entropy_result,
             "mutual_info_result": mutual_info_result,
         })
