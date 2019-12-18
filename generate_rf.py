@@ -86,7 +86,7 @@ def main():
         "receiver_lr": [0.01, 0.00001,0.001, 0.0001, 0.0005],
         "sender_entropy_coeff": [0, 0.001, 0.0001,],
         "receiver_entropy_coeff": [0, 0.001, 0.0001,],
-        "batch_size": [5],
+        "batch_size": [50],
     }
     options = list(itertools.product(*options.values()))
     samples = random.sample(options, 100)

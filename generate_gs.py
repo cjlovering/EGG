@@ -80,7 +80,7 @@ def main():
         "test_samples": [10],
         "sender_lr": [0.01, 0.00001,0.001, 0.0001, 0.0005], # [0.001, 0.0001, 0.0005],
         "receiver_lr": [0.01, 0.00001,0.001, 0.0001, 0.0005],
-        "batch_size": [5],
+        "batch_size": [40],
     }
     options = list(itertools.product(*options.values()))
     samples = options

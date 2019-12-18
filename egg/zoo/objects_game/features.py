@@ -108,9 +108,10 @@ class VectorsLoader:
 
     def collate(self, batch):
         tuples, target_idxs = [elem[0] for elem in batch], [elem[1] for elem in batch]
-        receiver_input = np.reshape(tuples, (self.batch_size, self.n_distractors+1, -1))
+        batch_size = min(len(target_idxs), self.batch_size)
+        receiver_input = np.reshape(tuples, (batch_size, self.n_distractors+1, -1))
         labels = np.array(target_idxs)
-        targets = receiver_input[np.arange(self.batch_size), labels]
+        targets = receiver_input[np.arange(batch_size), labels]
         return torch.from_numpy(targets).float(), torch.from_numpy(labels).long(), torch.from_numpy(receiver_input).float()
 
     def get_iterators(self):
@@ -127,15 +128,15 @@ class VectorsLoader:
             assert possible_tuples > self.train_samples + self.validation_samples + self.test_samples , f'Not enough data for requested split sizes. Reduced split samples or increase perceptual_dimensions'
             train, valid, test = self.generate_tuples(data=all_vectors)
 
-        assert self.train_samples > self.batch_size and self.validation_samples > self.batch_size and self.test_samples > self.batch_size, 'Batch size cannot be smaller than any split size'
+        # assert self.train_samples > self.batch_size and self.validation_samples > self.batch_size and self.test_samples > self.batch_size, 'Batch size cannot be smaller than any split size'
 
         train_dataset = TupleDataset(*train)
         valid_dataset = TupleDataset(*valid)
         test_dataset = TupleDataset(*test)
 
-        train_it = data.DataLoader(train_dataset, batch_size=self.batch_size, collate_fn=self.collate, drop_last=True, shuffle=self.shuffle_train_data)
-        validation_it = data.DataLoader(valid_dataset, batch_size=self.batch_size, collate_fn=self.collate, drop_last=True)
-        test_it = data.DataLoader(test_dataset, batch_size=self.batch_size, collate_fn=self.collate, drop_last=True)
+        train_it = data.DataLoader(train_dataset, batch_size=self.batch_size, collate_fn=self.collate, drop_last=False, shuffle=self.shuffle_train_data)
+        validation_it = data.DataLoader(valid_dataset, batch_size=self.batch_size, collate_fn=self.collate, drop_last=False)
+        test_it = data.DataLoader(test_dataset, batch_size=self.batch_size, collate_fn=self.collate, drop_last=False)
 
         if self.dump_data_folder:
             self.dump_data_folder.mkdir(exist_ok=True)
