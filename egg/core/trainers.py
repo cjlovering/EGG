@@ -121,17 +121,22 @@ class Trainer:
 
         return mean_loss.item(), mean_rest
 
-    def train_epoch(self):
+    def train_epoch(self, epoch):
         mean_loss = 0
         mean_rest = {}
         n_batches = 0
         self.game.train()
+
         for batch in self.train_data:
             self.optimizer.zero_grad()
             batch = move_to(batch, self.device)
             optimized_loss, rest = self.game(*batch)
             mean_rest = _add_dicts(mean_rest, rest)
             optimized_loss.backward()
+            if ((epoch // 100) % 2) == 1:
+                self.game.sender.zero_grad()
+            else:
+                self.game.receiver.zero_grad()
             self.optimizer.step()
 
             n_batches += 1
@@ -149,7 +154,7 @@ class Trainer:
             for callback in self.callbacks:
                 callback.on_epoch_begin()
 
-            train_loss, train_rest = self.train_epoch()
+            train_loss, train_rest = self.train_epoch(epoch)
 
             for callback in self.callbacks:
                 callback.on_epoch_end(train_loss, train_rest)

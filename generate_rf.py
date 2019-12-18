@@ -72,7 +72,7 @@ def template_exp_option(
 
 
 def main():
-    experiment_name = "rf"
+    experiment_name = "rf-switch"
     options = {
         "perceptual_dimensions": ["[10,10]"],
         "vocab_size": [20],
@@ -82,10 +82,10 @@ def main():
         "train_samples": [80],
         "validation_samples": [10],
         "test_samples": [10],
-        "sender_lr": [0.01, 0.00001,], # [0.001, 0.0001, 0.0005],
-        "receiver_lr": [0.01, 0.00001,],
-        "sender_entropy_coeff": [0.001, 0.0001,],
-        "receiver_entropy_coeff": [0.001, 0.0001,],
+        "sender_lr": [0.01, 0.00001,0.001, 0.0001, 0.0005], # [0.001, 0.0001, 0.0005],
+        "receiver_lr": [0.01, 0.00001,0.001, 0.0001, 0.0005],
+        "sender_entropy_coeff": [0, 0.001, 0.0001,],
+        "receiver_entropy_coeff": [0, 0.001, 0.0001,],
         "batch_size": [5],
     }
     options = list(itertools.product(*options.values()))
