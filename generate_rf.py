@@ -89,7 +89,7 @@ def main():
         "batch_size": [5],
     }
     options = list(itertools.product(*options.values()))
-    samples = options
+    samples = random.sample(options, 100)
     seeds = [0]
     modes = ["rf", "rf-deterministic",]
 
