@@ -68,7 +68,7 @@ def template_exp_option(
 
 
 def main():
-    experiment_name = "gs-switch"
+    experiment_name = "gs-50-switch"
     options = {
         "perceptual_dimensions": ["[10,10]"],
         "vocab_size": [20],
