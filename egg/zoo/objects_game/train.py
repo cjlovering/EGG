@@ -379,4 +379,4 @@ if __name__ == "__main__":
             "entropy_result": entropy_result,
             "mutual_info_result": mutual_info_result,
         })
-        df.to_csv(f"output-batch-50/{opts.experiment_id}.csv", index=False)
+        df.to_csv(f"output/{opts.experiment_id}.csv", index=False)
