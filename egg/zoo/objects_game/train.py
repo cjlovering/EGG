@@ -20,6 +20,8 @@ import pathlib
 
 import pandas as pd
 
+# from . import kfac
+
 def get_params():
     parser = argparse.ArgumentParser()
 
@@ -53,9 +55,9 @@ def get_params():
     parser.add_argument('--receiver_embedding', type=int, default=10,
                         help='Dimensionality of the embedding hidden layer for Receiver (default: 10)')
 
-    parser.add_argument('--sender_cell', type=str, default='rnn',
+    parser.add_argument('--sender_cell', type=str, default='gru',
                         help='Type of the cell used for Sender {rnn, gru, lstm} (default: rnn)')
-    parser.add_argument('--receiver_cell', type=str, default='rnn',
+    parser.add_argument('--receiver_cell', type=str, default='gru',
                         help='Type of the cell used for Receiver {rnn, gru, lstm} (default: rnn)')
 
     parser.add_argument('--sender_lr', type=float, default=1e-1,
@@ -262,6 +264,102 @@ if __name__ == "__main__":
             receiver_entropy_coeff=opts.receiver_entropy_coeff,
             length_cost=opts.length_cost
         )
+    # elif opts.mode.lower() == "ppo":
+    #     sender = core.RnnSenderPPO(
+    #         sender,
+    #         opts.vocab_size,
+    #         opts.sender_embedding,
+    #         opts.sender_hidden,
+    #         cell=opts.sender_cell,
+    #         max_len=opts.max_len,
+    #         force_eos=False
+    #     )
+    #     receiver = ReinforceReceiver(
+    #         output_size=data_loader.n_features, 
+    #         n_hidden=opts.receiver_hidden
+    #     )
+    #     receiver = core.RnnReceiverPPO(
+    #         receiver,
+    #         opts.vocab_size,
+    #         opts.receiver_embedding,
+    #         opts.receiver_hidden,
+    #         cell=opts.receiver_cell
+    #     )
+    #     game = core.SenderReceiverRnnPPO(
+    #         sender,
+    #         receiver,
+    #         non_differentiable_loss,
+    #         sender_entropy_coeff=opts.sender_entropy_coeff,
+    #         receiver_entropy_coeff=opts.receiver_entropy_coeff,
+    #         length_cost=opts.length_cost
+    #     )
+    elif opts.mode.lower() == "a2c":
+        sender = core.RnnA2CAgent(
+            sender,
+            None,
+            opts.vocab_size,
+            opts.sender_embedding,
+            opts.sender_hidden,
+            max_len=opts.max_len,
+            cell=opts.sender_cell,
+            force_eos=False,
+            is_sender=True,
+        )
+        receiver = ReinforceReceiver(
+            output_size=data_loader.n_features, 
+            n_hidden=opts.receiver_hidden
+        )
+        receiver = core.RnnA2CAgent(
+            None,
+            receiver,
+            opts.vocab_size,
+            opts.receiver_embedding,
+            opts.receiver_hidden,
+            cell=opts.receiver_cell,
+            max_len=opts.max_len,
+            force_eos=False,
+            is_sender=False,
+        )
+        game = core.SenderReceiverRnnA2C(
+            sender,
+            receiver,
+            sender_entropy_coeff=opts.sender_entropy_coeff,
+            receiver_entropy_coeff=opts.receiver_entropy_coeff,
+            length_cost=opts.length_cost
+        )
+    # elif opts.mode.lower() == "acktr":
+    #     sender = core.RnnA2C(
+    #         sender,
+    #         None,
+    #         opts.vocab_size,
+    #         opts.sender_embedding,
+    #         opts.sender_hidden,
+    #         max_len=opts.max_len,
+    #         cell=opts.sender_cell,
+    #         force_eos=False
+    #     )
+    #     receiver = ReinforceReceiver(
+    #         output_size=data_loader.n_features, 
+    #         n_hidden=opts.receiver_hidden
+    #     )
+    #     receiver = core.RnnA2C(
+    #         None,
+    #         receiver,
+    #         opts.vocab_size,
+    #         opts.receiver_embedding,
+    #         opts.receiver_hidden,
+    #         cell=opts.receiver_cell,
+    #         max_len=opts.max_len,
+    #         force_eos=False
+    #     )
+    #     game = core.SenderReceiverRnnA2C(
+    #         sender,
+    #         receiver,
+    #         sender_entropy_coeff=opts.sender_entropy_coeff,
+    #         receiver_entropy_coeff=opts.receiver_entropy_coeff,
+    #         length_cost=opts.length_cost,
+    #         acktr=True
+    #     )
     else:
         raise NotImplementedError(f'Unknown training mode, {opts.mode}')
 
@@ -269,7 +367,10 @@ if __name__ == "__main__":
         {'params': game.sender.parameters(), 'lr': opts.sender_lr},
         {'params': game.receiver.parameters(), 'lr': opts.receiver_lr}
     ])
-    callbacks = [core.ConsoleLogger(as_json=True)]
+    # if opts.mode.lower() == "acktr":
+    #     optimizer = kfac.KFACOptimizer(game)
+
+    callbacks = [core.ConsoleLogger(as_json=True, print_train_loss=True)]
     if opts.mode.lower() == 'gs':
         callbacks.append(core.TemperatureUpdater(agent=sender, decay=0.9, minimum=0.1))
     trainer = core.Trainer(game=game, optimizer=optimizer,
@@ -290,7 +391,9 @@ if __name__ == "__main__":
         receiver_outputs = torch.stack(receiver_outputs)
         labels = torch.stack(labels)
 
-        if opts.mode.lower() != 'rf':
+        output_is_vector =  opts.mode.lower() in set(['gs-hard', 'gs', 'rf-deterministic'])
+
+        if output_is_vector:
             tensor_accuracy = receiver_outputs.argmax(dim=1) == labels
         else:
             tensor_accuracy = receiver_outputs == labels
@@ -302,7 +405,7 @@ if __name__ == "__main__":
         train_receiver_outputs = torch.stack(train_receiver_outputs)
         train_labels = torch.stack(train_labels)
 
-        if opts.mode.lower() != 'rf':
+        if output_is_vector:
             train_tensor_accuracy = train_receiver_outputs.argmax(dim=1) == train_labels
         else:
             train_tensor_accuracy = train_receiver_outputs == train_labels
