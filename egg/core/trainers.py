@@ -133,10 +133,8 @@ class Trainer:
             optimized_loss, rest = self.game(*batch)
             mean_rest = _add_dicts(mean_rest, rest)
             optimized_loss.backward()
-            if ((epoch // 100) % 2) == 1:
-                self.game.sender.zero_grad()
-            else:
-                self.game.receiver.zero_grad()
+            self.game.sender.zero_grad()
+            self.game.receiver.zero_grad()
             self.optimizer.step()
 
             n_batches += 1
