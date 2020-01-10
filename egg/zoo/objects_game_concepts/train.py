@@ -80,6 +80,11 @@ def get_params():
         default=False,
         help="Shuffle train data before every epoch (default: False)",
     )
+    parser.add_argument(
+        "--cuda",
+        action="store_true",
+        default=False,
+    )
 
     parser.add_argument(
         "--sender_hidden",
