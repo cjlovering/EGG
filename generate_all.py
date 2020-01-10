@@ -32,23 +32,18 @@ def template_exp_option(
     experiment_id,
     mode,
     seed,
-    perceptual_dimensions,
     vocab_size,
     n_distractors,
     n_epoch,
     max_len,
-    train_samples,
-    validation_samples,
-    test_samples,
     lr,
     sender_entropy_coeff,
     receiver_entropy_coeff,
     batch_size,
 ):
     sender_lr = receiver_lr = lr
-    out = f"""python -m egg.zoo.objects_game.train \
+    out = f"""python -m egg.zoo.objects_game_concepts.train \
     --experiment_id {experiment_id} \
-    --perceptual_dimensions {perceptual_dimensions} \
     --vocab_size {vocab_size} \
     --n_distractors {n_distractors} \
     --n_epoch {n_epoch} \
@@ -60,11 +55,7 @@ def template_exp_option(
     --receiver_entropy_coeff {receiver_entropy_coeff} \
     --random_seed {seed} \
     --data_seed {seed} \
-    --train_samples {train_samples} \
-    --validation_samples {validation_samples} \
-    --test_samples {test_samples} \
     --evaluate \
-    --dump_msg_folder '../messages' \
     --shuffle_train_data \
     --mode {mode} &
 """
@@ -74,23 +65,19 @@ def template_exp_option(
 def main():
     experiment_name = "a2c"
     options = {
-        "perceptual_dimensions": ["[5,5,5]"],
-        "vocab_size": [15],
+        "vocab_size": [100],
         "n_distractors": [4],
-        "n_epoch": [10_000],
-        "max_len": [3],
-        "train_samples": [105],
-        "validation_samples": [10],
-        "test_samples": [10],
-        "lr": [2.5e-2, 2.5e-3, 2.5e-4, 2.5e-5], # [0.001, 0.0001, 0.0005],
-        "sender_entropy_coeff": [0],
-        "receiver_entropy_coeff": [0],
+        "n_epoch": [5_000],
+        "max_len": [2, 5, 10],
+        "lr": [0.0001], # [0.001, 0.0001, 0.0005],
+        "sender_entropy_coeff": [0.01],
+        "receiver_entropy_coeff": [0.001],
         "batch_size": [32],
     }
     options = list(itertools.product(*options.values()))
     samples = options
-    seeds = [0,1,2]
-    modes = ["a2c", "reinforce", "gs", "gs-hard"]
+    seeds = [0, 1, 2]
+    modes = ["rf", "rf-deterministic", "gs", "gs-hard"]
 
     exp_templates = []
     for mode in modes:
