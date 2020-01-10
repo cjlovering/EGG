@@ -461,7 +461,7 @@ if __name__ == "__main__":
             {"params": game.receiver.parameters(), "lr": opts.receiver_lr},
         ]
     )
-    callbacks = [core.ConsoleLogger(as_json=True)]
+    callbacks = [core.ConsoleLogger(print_train_loss=True, as_json=True)]
     if opts.mode.lower() == "gs":
         callbacks.append(core.TemperatureUpdater(agent=sender, decay=0.9, minimum=0.1))
     trainer = core.Trainer(

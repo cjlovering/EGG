@@ -12,6 +12,8 @@ def template_file(texts):
 #$ -e ./logs/
 #$ -o ./logs/
 #$ -l vf=4G
+#$ -l long
+#$ -l gpus=1
 
 source /data/nlp/lunar_pilot_env/bin/activate
 echo 'Starting job'
@@ -56,6 +58,7 @@ def template_exp_option(
     --random_seed {seed} \
     --data_seed {seed} \
     --evaluate \
+    --cuda \
     --shuffle_train_data \
     --mode {mode} &
 """
@@ -63,7 +66,7 @@ def template_exp_option(
 
 
 def main():
-    experiment_name = "a2c"
+    experiment_name = "cuda_concepts"
     options = {
         "vocab_size": [100],
         "n_distractors": [4],
