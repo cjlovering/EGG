@@ -10,10 +10,6 @@ from dataclasses import dataclass
 
 @dataclass
 class Task:
-    # # The max number of words per utterance.
-    # max_num_words: int
-    # # The size of the vocabulary.
-    # num_vocab: int
     # The total number of feature values.
     num_features: int
     # The number of items in context (num_distractors + 1).
@@ -34,7 +30,6 @@ class Dialog:
     context: torch.Tensor  # [items x dim] context
     referent: torch.Tensor  # [1 x dim] referent (input)
     target: int  # [1] referent (label)
-    context_debug: List[List[str]]  # context (used for logging).
 
 
 def collate(batch: List[Dialog]):
@@ -55,9 +50,9 @@ def collate(batch: List[Dialog]):
         The referent (label).
     """
     contexts = torch.stack([d.context for d in batch])
-    targets = torch.stack([d.referent for d in batch])
-    labels = torch.stack([d.target for d in batch])
-    return targets.squeeze(), labels, contexts
+    targets = torch.stack([d.referent for d in batch]).squeeze()
+    labels = torch.stack([d.target for d in batch]).squeeze()
+    return targets, labels, contexts
 
 
 class ToTensor:
@@ -79,8 +74,6 @@ class ToTensor:
 class Dataset(torch.utils.data.Dataset):
     to_tensor: ToTensor
     items: List[List[str]]
-    # max_num_words: int
-    # num_vocab: int
     num_context: int
 
     @classmethod
@@ -118,7 +111,7 @@ class Dataset(torch.utils.data.Dataset):
         target = torch.tensor([r])
         context = torch.stack([self.to_tensor(i) for i in context_text])
         referent = context[target]
-        return Dialog(context, referent, target, context_text)
+        return Dialog(context, referent, target)
 
 
 def get_dataloader(
@@ -132,8 +125,6 @@ def get_dataloader(
     dataset = Dataset.build(
         items,
         features,
-        # max_num_words=task.max_num_words,
-        # num_vocab=task.num_vocab,
         num_context=task.num_context,
     )
     return torch.utils.data.DataLoader(

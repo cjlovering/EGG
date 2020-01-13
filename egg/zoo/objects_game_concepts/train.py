@@ -455,7 +455,7 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError(f"Unknown training mode, {opts.mode}")
 
-    optimizer = torch.optim.Adam(
+    optimizer = torch.optim.RMSprop(
         [
             {"params": game.sender.parameters(), "lr": opts.sender_lr},
             {"params": game.receiver.parameters(), "lr": opts.receiver_lr},
